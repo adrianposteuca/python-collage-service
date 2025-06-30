@@ -1,26 +1,28 @@
 from pathlib import Path
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from PIL import Image
 
 app = FastAPI()
 
-# --- CONFIGURARE PATH ---
-BASE_DIR     = Path(__file__).resolve().parent
-TEMPLATE_PNG = BASE_DIR / "static" / "template.png"   # asigură-te că există aici
+# --- DIRECTOARE ȘI PATHURI ---
+BASE_DIR     = Path(__file__).parent.resolve()
+TEMPLATE_PNG = BASE_DIR / "static" / "template.png"
+PUBLIC_DIR   = BASE_DIR / "public"    # aici pui index.html, .css, .js etc.
 
-# --- DEFINIRE SLOT-URI după ce le-ai măsurat ---
-# Am păstrat ordinea: poza1 → găură1, poza2 → găură2, etc.
+# 1) Montează conţinutul din public/ la rădăcină
+app.mount("/", StaticFiles(directory=PUBLIC_DIR, html=True), name="public")
+
+
+# 2) Slot-urile „goale” din template (left, top, width, height)
 HOLES = [
-    # găura 1 (top-stânga în template-ul tău)  
-    {"left": 202,  "top":  311, "width": 943, "height": 1095},
-    # găura 2 (top-dreapta)  
-    {"left":1341,  "top":  311, "width": 937, "height": 1095},
-    # găura 3 (bottom-stânga)  
-    {"left": 202,  "top": 1954, "width": 943, "height": 1149},
-    # găura 4 (bottom-dreapta)  
-    {"left":1341,  "top": 1954, "width": 937, "height": 1149},
+    {"left": 202,  "top":  311, "width": 943, "height": 1095},  # P1
+    {"left":1341,  "top":  311, "width": 937, "height": 1095},  # P2
+    {"left": 202,  "top": 1954, "width": 943, "height": 1149},  # P3
+    {"left":1341,  "top": 1954, "width": 937, "height": 1149},  # P4
 ]
+
 
 @app.post("/generate")
 async def generate(
@@ -29,33 +31,32 @@ async def generate(
     photo3: UploadFile = File(...),
     photo4: UploadFile = File(...),
 ):
-    # 1) Verificăm existența template-ului
+    # 1. Verificăm că template-ul există
     if not TEMPLATE_PNG.exists():
-        raise HTTPException(500, detail=f"Template not found at {TEMPLATE_PNG}")
+        raise HTTPException(500, detail=f"Template not found: {TEMPLATE_PNG}")
 
-    # 2) Deschidem template-ul ca RGBA (are transparență)
+    # 2. Îl deschidem cu transparență
     template = Image.open(TEMPLATE_PNG).convert("RGBA")
 
     uploads = [photo1, photo2, photo3, photo4]
 
-    # 3) Pentru fiecare poză: redimensionăm și o poziționăm centrat în gaura sa
+    # 3. Pentru fiecare poză: thumbnail + centrare + alpha_composite
     for idx, (photo, hole) in enumerate(zip(uploads, HOLES), start=1):
         try:
             img = Image.open(photo.file).convert("RGBA")
         except Exception:
-            raise HTTPException(400, detail=f"Could not open image #{idx}")
+            raise HTTPException(400, detail=f"Cannot open image #{idx}")
 
-        # 3a) facem thumbnail păstrând proporțiile
+        # redimensionăm fără depășiri
         img.thumbnail((hole["width"], hole["height"]), Image.ANTIALIAS)
 
-        # 3b) calculăm un offset astfel încât să fie centrat în interiorul găurii
+        # centrare în interiorul „găurii”
         dx = hole["left"] + (hole["width"]  - img.width ) // 2
         dy = hole["top"]  + (hole["height"] - img.height) // 2
 
-        # 3c) suprapunem
         template.alpha_composite(img, (dx, dy))
 
-    # 4) Salvăm pe disc și trimitem ca răspuns
+    # 4. Salvăm și returnăm PNG-ul final
     out_path = BASE_DIR / "output.png"
     template.save(out_path, format="PNG")
 
@@ -64,6 +65,7 @@ async def generate(
         media_type="image/png",
         filename="colaj-before-after.png"
     )
+
 
 if __name__ == "__main__":
     import uvicorn
