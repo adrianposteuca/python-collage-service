@@ -1,28 +1,26 @@
+# app.py
 import os
-from pathlib import Path
-from io import BytesIO
-
 from fastapi import FastAPI, UploadFile, File, Form
-from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from PIL import Image
+from io import BytesIO
 
-# Instantiate the app
 app = FastAPI()
 
-# Base paths
-BASE_DIR = Path(__file__).parent
-PUBLIC_DIR = BASE_DIR / "public"
-STATIC_DIR = BASE_DIR / "static"
-TEMPLATE_PATH = STATIC_DIR / "template.png"  # your transparent PNG
+# mount the static/ folder so FastAPI can serve index.html (and anything else)
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# 1) Serve the HTML page on GET /
+TEMPLATE_PATH = os.path.join("static", "template.png")
+
 @app.get("/", response_class=HTMLResponse)
-async def serve_index():
-    return FileResponse(PUBLIC_DIR / "index.html")
+async def serve_form():
+    """
+    Serve your index.html (it should be located at static/index.html)
+    """
+    with open(os.path.join("static", "index.html"), "r", encoding="utf-8") as f:
+        return HTMLResponse(f.read())
 
-
-# 2) Handle the form POST at /generate
 @app.post("/generate")
 async def generate_collage(
     photo1: UploadFile = File(...),
@@ -38,40 +36,37 @@ async def generate_collage(
     p4Left: int = Form(...),
     p4Top: int = Form(...),
 ):
-    # Open the template overlay
+    # Load your transparent template
     template = Image.open(TEMPLATE_PATH).convert("RGBA")
+    canvas_w, canvas_h = template.size
 
-    # Paste each uploaded image into its slot,
-    # using its alpha channel as mask if present
-    for img_file, left, top in [
-        (photo1, p1Left, p1Top),
-        (photo2, p2Left, p2Top),
-        (photo3, p3Left, p3Top),
-        (photo4, p4Left, p4Top),
-    ]:
-        img = Image.open(img_file.file).convert("RGBA")
-        template.paste(img, (left, top), img)
+    # Create a white background canvas
+    collage = Image.new("RGBA", (canvas_w, canvas_h), "WHITE")
 
-    # Write result to in-memory buffer
-    buf = BytesIO()
-    template.save(buf, format="PNG")
-    buf.seek(0)
+    # Helper to read & paste each photo
+    async def paste_photo(upload: UploadFile, x: int, y: int):
+        data = await upload.read()
+        im = Image.open(BytesIO(data)).convert("RGBA")
+        # If you ever need to scale to a fixed size, do it here, e.g.:
+        # im = im.resize((SLOT_WIDTH, SLOT_HEIGHT), Image.LANCZOS)
+        collage.paste(im, (x, y), im)
 
-    # Return as downloadable attachment
-    return StreamingResponse(
-        buf,
+    # Paste all four
+    await paste_photo(photo1, p1Left, p1Top)
+    await paste_photo(photo2, p2Left, p2Top)
+    await paste_photo(photo3, p3Left, p3Top)
+    await paste_photo(photo4, p4Left, p4Top)
+
+    # Finally overlay the template so the photos only show in the "holes"
+    collage.paste(template, (0, 0), template)
+
+    # Save out
+    out_path = "collage.png"
+    # convert to RGB to drop alpha for maximum compatibility
+    collage.convert("RGB").save(out_path, "PNG")
+
+    return FileResponse(
+        out_path,
         media_type="image/png",
-        headers={"Content-Disposition": 'attachment; filename="collage.png"'},
+        filename="collage.png"
     )
-
-
-# 3) Mount only /static for assets (CSS/JS, template.png, etc.)
-app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
-
-
-# 4) If you run locally, allow `python app.py` to start it:
-if __name__ == "__main__":
-    import uvicorn
-
-    port = int(os.environ.get("PORT", 8000))
-    uvicorn.run("app:app", host="0.0.0.0", port=port, reload=True)
