@@ -1,49 +1,58 @@
 # app.py
-from fastapi import FastAPI, File, UploadFile
-from fastapi.responses import StreamingResponse
+from fastapi import FastAPI, UploadFile, File, Form
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import StreamingResponse, FileResponse
 from PIL import Image
 from io import BytesIO
-from pathlib import Path   # ← add this import!
+from pathlib import Path
 
+# 1) Create app and mount static dirs
 app = FastAPI()
 
-# resolve template.png relative to this file
-BASE_DIR = Path(__file__).resolve().parent
-TEMPLATE_PATH = BASE_DIR / "static" / "template.png"
+# Serve your HTML+JS+CSS form from ./public
+app.mount("/", StaticFiles(directory="public", html=True), name="public")
+
+# Serve your template (and any other assets) from ./static
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+# Path to your transparent template PNG
+TEMPLATE_PATH = Path("static") / "template.png"
+
 
 @app.post("/generate")
-async def generate(
-    photo1: UploadFile = File(...),
-    photo2: UploadFile = File(...),
-    photo3: UploadFile = File(...),
-    photo4: UploadFile = File(...),
-    p1Left: int = 120, p1Top: int = 180,
-    p2Left: int = 788, p2Top: int = 180,
-    p3Left: int = 120, p3Top: int = 1140,
-    p4Left: int = 788, p4Top: int = 1140,
+async def generate_collage(
+    # four uploaded files
+    photo1: UploadFile  = File(...),
+    photo2: UploadFile  = File(...),
+    photo3: UploadFile  = File(...),
+    photo4: UploadFile  = File(...),
+    # their X/Y positions from the form
+    p1Left: int = Form(...),  p1Top: int = Form(...),
+    p2Left: int = Form(...),  p2Top: int = Form(...),
+    p3Left: int = Form(...),  p3Top: int = Form(...),
+    p4Left: int = Form(...),  p4Top: int = Form(...),
 ):
-    # open the template
+    # 2) Load template
     template = Image.open(TEMPLATE_PATH).convert("RGBA")
 
-    # load each upload into an RGBA image
-    def load_upload(u):
-        return Image.open(BytesIO(u.file.read())).convert("RGBA")
+    # 3) Composite each photo onto template
+    for img_file, left, top in [
+        (photo1, p1Left, p1Top),
+        (photo2, p2Left, p2Top),
+        (photo3, p3Left, p3Top),
+        (photo4, p4Left, p4Top),
+    ]:
+        img = Image.open(img_file.file).convert("RGBA")
+        # If you need to resize photos to fit your “holes”, you can:
+        # img = img.resize((hole_width, hole_height), Image.ANTIALIAS)
+        template.paste(img, (left, top), img)
 
-    imgs = {
-        (p1Left, p1Top): load_upload(photo1),
-        (p2Left, p2Top): load_upload(photo2),
-        (p3Left, p3Top): load_upload(photo3),
-        (p4Left, p4Top): load_upload(photo4),
-    }
-
-    # composite each photo onto the template
-    out = template.copy()
-    for (x, y), img in imgs.items():
-        # optionally resize img to fit hole here…
-        out.alpha_composite(img, dest=(x, y))
-
-    # return as PNG
+    # 4) Stream back a PNG
     buf = BytesIO()
-    out.save(buf, format="PNG")
+    template.save(buf, format="PNG")
     buf.seek(0)
-    return StreamingResponse(buf, media_type="image/png")
+    return StreamingResponse(
+        buf,
+        media_type="image/png",
+        headers={"Content-Disposition": 'attachment; filename="collage.png"'},
+    )
