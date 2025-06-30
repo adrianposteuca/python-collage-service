@@ -10,8 +10,12 @@ app = FastAPI()
 # 1) Mount static files & serve index.html at /
 app.mount("/", StaticFiles(directory="public", html=True), name="public")
 
+# the directory where this file (app.py) lives:
+BASE_DIR = Path(__file__).resolve().parent
+
 # 2) Load the transparent template once
-TEMPLATE_PATH = os.path.join("static", "template.png")
+# if you moved static/ beside app.py:
+TEMPLATE_PATH = BASE_DIR / "static" / "template.png"
 template = Image.open(TEMPLATE_PATH).convert("RGBA")
 CANVAS_W, CANVAS_H = template.size
 
