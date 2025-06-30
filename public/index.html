@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+  <meta charset="UTF-8">
+  <title>Generează Colaj Before/After</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      max-width: 600px;
+      margin: 2em auto;
+      padding: 0 1em;
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 1em;
+    }
+    form > label {
+      display: block;
+      margin-bottom: 1.5em;
+    }
+    label span {
+      display: inline-block;
+      width: 80px;
+      font-weight: bold;
+    }
+    input[type="file"] {
+      display: block;
+      margin-top: 0.5em;
+    }
+    .coords {
+      margin: 0.5em 0 0 80px;
+    }
+    .coords input[type="number"] {
+      width: 4em;
+      margin-right: 1em;
+    }
+    button {
+      display: block;
+      margin: 2em auto;
+      padding: 0.75em 1.5em;
+      font-size: 1em;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Generează Colaj Before/After</h1>
+
+  <form action="/generate" method="post" enctype="multipart/form-data">
+    <!-- Fotografia 1 -->
+    <label>
+      <span>Poza 1:</span>
+      <input type="file" name="photo1" accept="image/*" required>
+      <div class="coords">
+        <label>X: <input type="number" name="p1Left" value="120" required></label>
+        <label>Y: <input type="number" name="p1Top"  value="180" required></label>
+      </div>
+    </label>
+
+    <!-- Fotografia 2 -->
+    <label>
+      <span>Poza 2:</span>
+      <input type="file" name="photo2" accept="image/*" required>
+      <div class="coords">
+        <label>X: <input type="number" name="p2Left" value="788" required></label>
+        <label>Y: <input type="number" name="p2Top"  value="180" required></label>
+      </div>
+    </label>
+
+    <!-- Fotografia 3 -->
+    <label>
+      <span>Poza 3:</span>
+      <input type="file" name="photo3" accept="image/*" required>
+      <div class="coords">
+        <label>X: <input type="number" name="p3Left" value="120" required></label>
+        <label>Y: <input type="number" name="p3Top"  value="1140" required></label>
+      </div>
+    </label>
+
+    <!-- Fotografia 4 -->
+    <label>
+      <span>Poza 4:</span>
+      <input type="file" name="photo4" accept="image/*" required>
+      <div class="coords">
+        <label>X: <input type="number" name="p4Left" value="788" required></label>
+        <label>Y: <input type="number" name="p4Top"  value="1140" required></label>
+      </div>
+    </label>
+
+    <button type="submit">Generează și Descarcă Colajul</button>
+  </form>
+
+</body>
+</html>
