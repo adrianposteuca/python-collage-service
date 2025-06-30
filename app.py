@@ -16,9 +16,9 @@ TEMPLATE_PATH = os.path.join("static", "template.png")
 @app.get("/", response_class=HTMLResponse)
 async def serve_form():
     """
-    Serve your index.html (it should be located at static/index.html)
+    Serve your index.html (it should be located at public/index.html)
     """
-    with open(os.path.join("static", "index.html"), "r", encoding="utf-8") as f:
+    with open(os.path.join("public", "index.html"), "r", encoding="utf-8") as f:
         return HTMLResponse(f.read())
 
 @app.post("/generate")
