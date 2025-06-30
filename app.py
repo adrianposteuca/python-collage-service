@@ -5,6 +5,7 @@ from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from PIL import Image
 from io import BytesIO
+from pathlib import Path
 
 app = FastAPI()
 
@@ -21,7 +22,7 @@ app = FastAPI()
 # --- CONFIGURARE ---
 
 # Unde se află template-ul (cu transparență)
-BASE_DIR = Path(__file__).parent
+BASE_DIR = Path(__file__).resolve().parent
 TEMPLATE_PATH = BASE_DIR / "static" / "template.png"
 
 # Dimensiunile sloturilor (width, height) în pixeli.
